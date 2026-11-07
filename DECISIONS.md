@@ -41,5 +41,9 @@ Living record of architecture tradeoffs (per `plan.md` §11). Newest last. Each 
 - **Date:** 2026-11-07
 - **Decision:** Monorepo-lite at repo root: `plan.md`, `DECISIONS.md`, `TASKS.md`, `migrations/` (InsForge CLI), `seeds/`, `functions/` (edge function source), `app/` (Vite frontend), `agents/` (AI workflow agents), `tests/`, `pm/` (PM workflow templates).
 
+## D9 — Keys & env contract
+- **Date:** 2026-11-07
+- **Decision:** All keys live in gitignored root `.env.local`: `NEXT_PUBLIC_INSFORGE_URL`, `NEXT_PUBLIC_INSFORGE_ANON_KEY`, `INSFORGE_API_KEY` (server-only scripts/tests), `VIBE_API_KEY` (Mistral), `OPENROUTER_API_KEY` (server-only; provisioned via `npx -y @insforge/cli ai setup`). Frontend reads `VITE_INSFORGE_URL` / `VITE_INSFORGE_ANON_KEY` from `app/.env.local` (same values, Vite prefix). Edge functions read project **secrets** (`INSFORGE_BASE_URL`, `API_KEY`, `ANON_KEY`) via `Deno.env` — never copy raw keys into function code. AI inference in functions uses the backend Model Gateway (`admin.ai.chat.completions`) so the OpenRouter key never needs to be copied into function secrets.
+
 ## Open (mirrors plan §12, block production only)
 Existing site/domain, calendar source of truth, volunteer roster, sending email identity, historic rosters, club permission sign-off, hosting budget, pilot team — all pending committee answers. Defaults in plan §12 apply.
