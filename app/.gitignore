@@ -1,0 +1,6 @@
+node_modules
+dist
+.env
+.env.local
+.env*.local
+src/routeTree.gen.ts

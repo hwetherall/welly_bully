@@ -1,0 +1,13 @@
+{
+  "name": "bulldogs-os",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "seed": "node seeds/seed.mjs",
+    "test:wf01": "node tests/wf01.test.mjs"
+  },
+  "dependencies": {
+    "@insforge/sdk": "latest"
+  }
+}
