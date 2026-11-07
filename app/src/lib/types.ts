@@ -32,3 +32,36 @@ export interface ActionQueueRow {
   enquired_at: string
   owner_id: string | null
 }
+
+/** Row of public.enquiries as the admin dashboard selects it
+ * (`person:people(first_name,last_name,email)` embed; PostgREST may type the
+ * to-one embed as an array, so normalize at runtime). */
+export interface EnquiryRow {
+  id: string
+  stage: string
+  created_at: string
+  assigned_to: string | null
+  utm_source: string | null
+  person:
+    | { first_name: string; last_name: string | null; email: string }
+    | { first_name: string; last_name: string | null; email: string }[]
+    | null
+}
+
+/** Row of public.notification_jobs as the admin dashboard selects it. */
+export interface NotificationJobRow {
+  id: string
+  type: string
+  to_email: string
+  status: string
+  attempts: number
+  created_at: string
+  last_error: string | null
+}
+
+/** Row of public.club_members (staff directory; readable by club users). */
+export interface ClubMember {
+  id: string
+  email: string
+  full_name: string | null
+}

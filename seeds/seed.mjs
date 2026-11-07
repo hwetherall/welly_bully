@@ -43,6 +43,17 @@ async function main() {
   }
   console.log('roles ok');
 
+  // club_members directory (idempotent upsert per user)
+  const memberRows = USERS.map(u => ({ id: userIds[u.email], email: u.email, full_name: u.email.split('@')[0].replace('.', ' ').replace(/\b\w/g, c => c.toUpperCase()), active: true }));
+  for (const row of memberRows) {
+    const { data: existing } = await admin.database.from('club_members').select('id').eq('id', row.id);
+    if (!existing || existing.length === 0) {
+      const { error } = await admin.database.from('club_members').insert([row]);
+      if (error) throw new Error('club_members insert: ' + error.message);
+    }
+  }
+  console.log('club_members ok');
+
   // skip business rows if already seeded
   const { data: seasonCheck } = await admin.database.from('seasons').select('id').eq('year', 2026);
   if (seasonCheck && seasonCheck.length > 0) {

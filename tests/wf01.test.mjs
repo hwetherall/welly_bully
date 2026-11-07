@@ -62,7 +62,8 @@ await group('T1 happy path', async () => {
     landingUrl: 'https://bulldogs-dev.example/landing',
     utmSource: 'test', utmMedium: 'e2e', utmCampaign: 'wf01',
   };
-  const r = await post(body);
+  // unique doc IP per run so the shared rate-limit bucket doesn't leak between test runs
+  const r = await post(body, { 'X-Forwarded-For': `192.0.2.${(ts % 200) + 1}` });
   report('T1a POST returns 200 ok:true duplicate:false',
     r.status === 200 && r.json?.ok === true && r.json?.duplicate === false,
     `status=${r.status} body=${JSON.stringify(r.json)}`);
@@ -81,8 +82,8 @@ await group('T1 happy path', async () => {
       `delta=${(deltaMs / 1000).toFixed(1)}s`);
   }
 
-  const jobs = await query('notification_jobs', 'id', [['enquiry_id', enquiryId]]);
-  report('T1f exactly 1 notification_jobs row for enquiry', jobs.length === 1, `count=${jobs.length}`);
+  const jobs = await query('notification_jobs', 'id', [['enquiry_id', enquiryId], ['type', 'confirmation_email']]);
+  report('T1f exactly 1 confirmation_email job for enquiry (P0.3)', jobs.length === 1, `count=${jobs.length}`);
 });
 
 // (2) Idempotency: resending the same body returns duplicate:true, no new rows.
@@ -92,7 +93,7 @@ await group('T2 idempotency', async () => {
     firstName: 'Wff', lastName: 'Happy', email: `wf01.happy.${ts}@synthetic.test`,
     phone: '+1-555-0199', consent: true, idempotencyKey: key,
   };
-  const r = await post(body);
+  const r = await post(body, { 'X-Forwarded-For': `192.0.2.${(ts % 200) + 1}` }); // same run bucket as T1
   report('T2a resend returns 200 duplicate:true',
     r.status === 200 && r.json?.ok === true && r.json?.duplicate === true,
     `status=${r.status} body=${JSON.stringify(r.json)}`);
@@ -100,10 +101,11 @@ await group('T2 idempotency', async () => {
   const enquiries = await query('enquiries', 'id', [['idempotency_key', key]]);
   const enquiryId = r.json?.enquiry_id ?? (await query('enquiries', 'id', [['idempotency_key', key]]))[0]?.id;
   const tasks = await query('tasks', 'id', [['enquiry_id', enquiryId], ['type', 'make_initial_call']]);
-  const jobs = await query('notification_jobs', 'id', [['enquiry_id', enquiryId]]);
-  report('T2b counts unchanged (1 enquiry / 1 task / 1 job)',
-    enquiries.length === 1 && tasks.length === 1 && jobs.length === 1,
-    `enquiries=${enquiries.length} tasks=${tasks.length} jobs=${jobs.length}`);
+  const jobs = await query('notification_jobs', 'id', [['enquiry_id', enquiryId], ['type', 'confirmation_email']]);
+  const alerts = await query('notification_jobs', 'id', [['enquiry_id', enquiryId], ['type', 'internal_alert']]);
+  report('T2b counts unchanged (1 enquiry / 1 task / 1 confirmation / 1 alert)',
+    enquiries.length === 1 && tasks.length === 1 && jobs.length === 1 && alerts.length === 1,
+    `enquiries=${enquiries.length} tasks=${tasks.length} confirm=${jobs.length} alerts=${alerts.length}`);
 });
 
 // (3) Validation: missing consent -> 400, bad email -> 400, missing firstName -> 400.
@@ -146,6 +148,27 @@ await group('T4 rate limit', async () => {
   const n429 = statuses.filter((s) => s === 429).length;
   report('T4a at least one 429 among 6 rapid submissions', n429 >= 1, `statuses=${statuses.join(',')}`);
   report('T4b 429 body is {error:"rate_limited"}', sawRateLimitedBody);
+});
+
+// (5) Browser path: the SPA calls the function with the ANON key via SDK invoke — no auth.
+await group('T5 anon SDK invoke (browser path)', async () => {
+  const { createClient } = await import('@insforge/sdk');
+  const anon = createClient({ baseUrl: BASE, anonKey: readFileSync(new URL('../.env.local', import.meta.url), 'utf8').match(/NEXT_PUBLIC_INSFORGE_ANON_KEY=(.+)/)[1].trim() });
+  const key = `wf01-test-anon-${ts}`;
+  const { data, error } = await anon.functions.invoke('submit-enquiry', {
+    body: {
+      firstName: 'Browser', email: `wf01.anon.${ts}@synthetic.test`, phone: '+1-555-0166',
+      consent: true, idempotencyKey: key,
+    },
+    headers: { 'X-Forwarded-For': `192.0.2.${(ts % 200) + 2}` }, // fresh bucket per run
+  });
+  report('T5a anon invoke returns ok:true', !error && data?.ok === true, `error=${error?.message} data=${JSON.stringify(data)?.slice(0, 200)}`);
+
+  // (6) internal alert to the assigned volunteer was queued (P0.4)
+  const enquiryId = data?.enquiry_id;
+  const alerts = await query('notification_jobs', 'id,type,to_email,status', [['enquiry_id', enquiryId], ['type', 'internal_alert']]);
+  report('T6a exactly 1 internal_alert job for the enquiry', alerts.length === 1, `count=${alerts.length} to=${alerts[0]?.to_email}`);
+  report('T6b alert addressed to a club volunteer (bulldogs-dev.test)', Boolean(alerts[0]?.to_email?.endsWith('@bulldogs-dev.test')));
 });
 
 console.log(`\n${failures === 0 ? 'ALL WF-01 TESTS PASSED' : `${failures} CHECK(S) FAILED`}`);

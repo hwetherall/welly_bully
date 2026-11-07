@@ -15,13 +15,16 @@ Source of truth for what's done / doing / next. Mirrors `plan.md` §10 sprints. 
 
 **Sprint 0 exit (plan §10):** ✅ repo + environments work; synthetic test data + role access established; decisions logged; no live personal data, no real emails, no deployment.
 
-## Sprint 1 — First enquiry: visitor → assigned task (P0.1–P0.4)
-- [ ] P0.1 landing page live-wired to published events (next session card, map link, CTA)
-- [ ] P0.2 signup form → `submit-enquiry` (validation, consent, dedupe, UTM capture)
-- [ ] P0.3 confirmation email via `notification_jobs` + mailer function (approval-gated)
-- [ ] P0.4 volunteer rotation assignment + 48h `make_initial_call` task + internal alert
-- [ ] Admin: enquiry appears with owner + deadline; basic admin view
-- [ ] E2E happy-path test: mobile-width submit → exactly one queued email → one owner → correct due date
+## Sprint 1 — First enquiry: visitor → assigned task (P0.1–P0.4) — DONE 2026-11-07
+- [x] P0.1 landing page live-wired to published events (next session card, map link, CTA) — app/ route `/`, verified against live DB
+- [x] P0.2 signup form → `submit-enquiry` (validation, consent, dedupe, UTM capture) — 15/15 tests incl. anon browser-path invoke
+- [x] P0.3 confirmation email via `notification_jobs` + mailer `process-notification-jobs` (dry-run default `EMAIL_DRY_RUN=true`; real send approval-gated) — 7/7 mailer tests
+- [x] P0.4 volunteer rotation + 48h `make_initial_call` task + `internal_alert` job to assignee (club_members lookup) — asserted in tests
+- [x] Admin: action queue + enquiries + notification jobs panels with owner/deadline/status chips (app/src/routes/admin.tsx, lib/admin.ts; 24/24 app tests)
+- [x] E2E happy-path test: submit → 1 confirmation job + 1 alert → one owner → due +48h (delta 0.0s) → idempotent resubmit; live smoke: action_queue row + both jobs dry_run
+- [x] Migration 2: `internal_alert`/`dry_run` enums + `club_members` table + seeded
+
+**Sprint 1 acceptance (plan §10):** ✅ test prospect submits (anon, browser path), sees confirmation data, exactly one confirmation email job queued (dry-run), appears in admin action queue with one owner and due = created+48h; duplicate submit and mailer failure don't corrupt records. Known follow-up: club_members self-upsert is admin-only by RLS (5 dev users seeded; add RPC path in Sprint 2 if needed).
 
 ## Sprint 2 — Volunteer workflow + scoreboard (P0.5–P0.6)
 - [ ] CRM list/profile, interactions, stage changes, action queue, coordinator dashboard, audit trail

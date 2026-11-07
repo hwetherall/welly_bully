@@ -195,6 +195,28 @@ export default async function (req: Request): Promise<Response> {
     });
     if (rpcError) return json({ error: 'submit_failed', message: rpcError.message }, 500);
 
+    // P0.4: internal alert to the assigned volunteer (never a message to the prospect).
+    // Idempotent per enquiry so duplicate submissions don't re-alert.
+    const rpc = rpcData as Record<string, unknown>;
+    if (rpc?.assigned_to && rpc?.duplicate !== true) {
+      const { data: member } = await admin.database
+        .from('club_members')
+        .select('email')
+        .eq('id', rpc.assigned_to)
+        .limit(1);
+      if (member && member.length > 0) {
+        await admin.database.from('notification_jobs').insert([{
+          type: 'internal_alert',
+          person_id: rpc.person_id,
+          enquiry_id: rpc.enquiry_id,
+          to_email: (member[0] as { email: string }).email,
+          subject: 'New Bulldogs enquiry assigned to you — call within 48h',
+          body: `A new enquiry (${String(rpc.person_id).slice(0, 8)}…) was assigned to you. Task: make_initial_call, due 48h after receipt. Log in to the admin app to call and log the outcome.`,
+          idempotency_key: `alert:${String(rpc.enquiry_id)}`,
+        }]);
+      }
+    }
+
     // Next published public event for the confirmation page (plan P0.1/P0.2).
     const { data: nextEvents, error: evErr } = await admin.database
       .from('events')
@@ -206,7 +228,7 @@ export default async function (req: Request): Promise<Response> {
       .limit(1);
     if (evErr) return json({ error: 'event_lookup_failed', message: evErr.message }, 500);
 
-    return json({ ...(rpcData as Record<string, unknown>), next_event: nextEvents?.[0] ?? null }, 200);
+    return json({ ...rpc, next_event: nextEvents?.[0] ?? null }, 200);
   } catch (err) {
     return json({ error: 'internal_error', message: String(err) }, 500);
   }

@@ -1,24 +1,44 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { insforge } from '../lib/insforge'
 import { formatTimestamp } from '../lib/format'
-import type { ActionQueueRow } from '../lib/types'
+import {
+  displayNameFromUser,
+  isOverdue,
+  notificationStatusChip,
+  ownerName,
+  stageChip,
+} from '../lib/admin'
+import type { ActionQueueRow, ClubMember, EnquiryRow, NotificationJobRow } from '../lib/types'
 
 export const Route = createFileRoute('/admin')({
   component: AdminPage,
 })
 
-type User = { id: string; email?: string }
+type User = {
+  id: string
+  email?: string
+  user_metadata?: Record<string, unknown> | null
+  metadata?: Record<string, unknown> | null
+  profile?: { name?: string } | null
+}
 
 type RoleRow = { role_id: number; roles: { name: string } | null }
 
-type QueueState =
+type PanelState<T> =
   | { status: 'loading' }
   | { status: 'error'; error: string }
-  | { status: 'done'; rows: ActionQueueRow[] }
+  | { status: 'done'; rows: T[] }
 
-// Admin shell (Sprint 0/1): InsForge auth sign-in, role check via user_roles,
-// then the action queue (plan P0.6 placeholder dashboard).
+/** Normalize a PostgREST to-one embed (`person:people(...)`, `roles(...)`),
+ * which may arrive as an object or a single-element array. */
+function toOne<T>(embed: T | T[] | null): T | null {
+  return Array.isArray(embed) ? embed[0] ?? null : embed
+}
+
+// Admin dashboard (Sprint 1, plan P0.4/P0.6): InsForge auth sign-in, role check via
+// user_roles, club_members upsert, then three panels — action queue, enquiries,
+// notification jobs (failed/dry_run delivery stays visible, WF-01.7).
 function AdminPage() {
   const [user, setUser] = useState<User | null | undefined>(undefined) // undefined = checking session
   const [email, setEmail] = useState('')
@@ -28,21 +48,47 @@ function AdminPage() {
 
   const [roles, setRoles] = useState<RoleRow[] | null>(null)
   const [rolesError, setRolesError] = useState<string | null>(null)
-  const [queue, setQueue] = useState<QueueState>({ status: 'loading' })
+  const [members, setMembers] = useState<ClubMember[]>([])
+  const [queue, setQueue] = useState<PanelState<ActionQueueRow>>({ status: 'loading' })
+  const [enquiries, setEnquiries] = useState<PanelState<EnquiryRow>>({ status: 'loading' })
+  const [jobs, setJobs] = useState<PanelState<NotificationJobRow>>({ status: 'loading' })
 
   useEffect(() => {
     void insforge.auth.getCurrentUser().then(({ data }) => setUser(data?.user ?? null))
   }, [])
 
-  // Once we have a session, load club roles, then the action queue.
+  // Once we have a session, load club roles; if the account is staff, mirror it
+  // into club_members (best effort — RLS may deny, seeds cover the dev users)
+  // and load the dashboard panels.
   useEffect(() => {
     if (!user) return
     let cancelled = false
+
+    // club_members is written by admins only (migration 2 RLS + grants). Try an
+    // upsert with the user session, fall back to insert-ignore-duplicates; if
+    // both are blocked, skip silently — seeds already cover the 5 dev users.
+    async function ensureClubMember(u: User) {
+      const row = { id: u.id, email: u.email ?? '', full_name: displayNameFromUser(u) }
+      const { error: upsertError } = await insforge.database
+        .from('club_members')
+        .upsert([row], { onConflict: 'id' })
+      if (upsertError) {
+        // on conflict do nothing (this postgrest-js exposes ignoreDuplicates on upsert only)
+        const { error: insertError } = await insforge.database
+          .from('club_members')
+          .upsert([row], { onConflict: 'id', ignoreDuplicates: true })
+        if (insertError) {
+          console.warn('[admin] club_members upsert blocked by RLS, skipping:', insertError.message)
+        }
+      }
+    }
 
     async function load() {
       setRoles(null)
       setRolesError(null)
       setQueue({ status: 'loading' })
+      setEnquiries({ status: 'loading' })
+      setJobs({ status: 'loading' })
 
       const { data, error } = await insforge.database
         .from('user_roles')
@@ -53,23 +99,59 @@ function AdminPage() {
         setRolesError(error.message)
         return
       }
-      // PostgREST types the to-one `roles` embed as an array; normalize to a single object.
       const roleRows: RoleRow[] = ((data ?? []) as unknown[]).map((r) => {
         const row = r as { role_id: number; roles: { name: string } | { name: string }[] | null }
-        return { role_id: row.role_id, roles: Array.isArray(row.roles) ? row.roles[0] ?? null : row.roles }
+        return { role_id: row.role_id, roles: toOne(row.roles) }
       })
       setRoles(roleRows)
-      if (roleRows.length === 0) return // not a club account — no queue fetch
+      if (roleRows.length === 0) return // not a club account — no dashboard fetch
 
+      void ensureClubMember(user!)
+
+      // club_members directory, used to resolve owner names in every panel
+      const { data: memberRows, error: membersError } = await insforge.database
+        .from('club_members')
+        .select('id, email, full_name')
+      if (!cancelled && !membersError) setMembers((memberRows ?? []) as ClubMember[])
+
+      // (a) Action queue: open/attempted/reassigned tasks, soonest due first (P0.6)
       const { data: queueRows, error: queueError } = await insforge.database
         .from('action_queue')
         .select('*')
+        .order('due_at')
         .limit(50)
       if (cancelled) return
       setQueue(
         queueError
           ? { status: 'error', error: queueError.message }
           : { status: 'done', rows: (queueRows ?? []) as ActionQueueRow[] }
+      )
+
+      // (b) Enquiries: latest 50 with lead + stage + owner (P0.6)
+      const { data: enquiryRows, error: enquiriesError } = await insforge.database
+        .from('enquiries')
+        .select('id,stage,created_at,assigned_to,utm_source,person:people(first_name,last_name,email)')
+        .order('created_at', { ascending: false })
+        .limit(50)
+      if (cancelled) return
+      setEnquiries(
+        enquiriesError
+          ? { status: 'error', error: enquiriesError.message }
+          : { status: 'done', rows: (enquiryRows ?? []) as EnquiryRow[] }
+      )
+
+      // (c) Notification jobs: latest 50; failed/dry_run chips keep delivery
+      // problems visible without losing the lead (WF-01.7)
+      const { data: jobRows, error: jobsError } = await insforge.database
+        .from('notification_jobs')
+        .select('id,type,to_email,status,attempts,created_at,last_error')
+        .order('created_at', { ascending: false })
+        .limit(50)
+      if (cancelled) return
+      setJobs(
+        jobsError
+          ? { status: 'error', error: jobsError.message }
+          : { status: 'done', rows: (jobRows ?? []) as NotificationJobRow[] }
       )
     }
 
@@ -99,7 +181,10 @@ function AdminPage() {
     await insforge.auth.signOut()
     setUser(null)
     setRoles(null)
+    setMembers([])
     setQueue({ status: 'loading' })
+    setEnquiries({ status: 'loading' })
+    setJobs({ status: 'loading' })
   }
 
   if (user === undefined) {
@@ -160,7 +245,7 @@ function AdminPage() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-extrabold text-white">Action queue</h1>
+        <h1 className="text-2xl font-extrabold text-white">Admin dashboard</h1>
         <button
           type="button"
           onClick={onSignOut}
@@ -191,54 +276,148 @@ function AdminPage() {
           <p className="mt-2 text-sm text-navy-100">
             Roles: {roles.map((r) => r.roles?.name ?? r.role_id).join(', ')}
           </p>
-          {queue.status === 'loading' && <p className="mt-6 text-navy-100">Loading action queue…</p>}
-          {queue.status === 'error' && (
-            <div role="alert" className="mt-6 rounded-lg bg-burgundy-100 p-3 text-sm font-medium text-burgundy-800">
-              Could not load the action queue: {queue.error}
-            </div>
-          )}
-          {queue.status === 'done' && queue.rows.length === 0 && (
-            <p className="mt-6 rounded-xl bg-navy-800 p-5 text-navy-100">
-              Nothing in the queue right now — no open or attempted tasks. 🎉
-            </p>
-          )}
-          {queue.status === 'done' && queue.rows.length > 0 && (
-            <div className="mt-4 overflow-x-auto rounded-xl bg-white shadow">
-              <table className="min-w-full text-left text-sm text-navy-800">
-                <thead>
-                  <tr className="border-b border-navy-100 text-xs uppercase tracking-wide text-navy-600">
-                    <th className="px-3 py-2">Task</th>
-                    <th className="px-3 py-2">State</th>
-                    <th className="px-3 py-2">Lead</th>
-                    <th className="px-3 py-2">Due</th>
-                    <th className="px-3 py-2">Enquired</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {queue.rows.map((row) => (
-                    <tr key={row.task_id} className="border-b border-navy-100 last:border-0">
-                      <td className="px-3 py-2 font-medium">
-                        {row.task_type}
-                        {row.overdue && (
-                          <span className="ml-2 rounded bg-burgundy-700 px-1.5 py-0.5 text-xs font-bold text-white">
-                            overdue
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2">{row.task_state}</td>
-                      <td className="px-3 py-2">
-                        {row.first_name} {row.last_name ?? ''}
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap">{formatTimestamp(row.due_at)}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">{formatTimestamp(row.enquired_at)}</td>
+
+          <div className="mt-6 space-y-8">
+            <Panel title="Action queue" state={queue}>
+              {(rows) => (
+                <table className="min-w-full text-left text-sm text-navy-800">
+                  <thead>
+                    <tr className="border-b border-navy-100 text-xs uppercase tracking-wide text-navy-600">
+                      <th className="px-3 py-2">Task</th>
+                      <th className="px-3 py-2">State</th>
+                      <th className="px-3 py-2">Lead</th>
+                      <th className="px-3 py-2">Due</th>
+                      <th className="px-3 py-2">Enquired</th>
+                      <th className="px-3 py-2">Owner</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  </thead>
+                  <tbody>
+                    {rows.map((row) => (
+                      <tr key={row.task_id} className="border-b border-navy-100 last:border-0">
+                        <td className="px-3 py-2 font-medium">
+                          {row.task_type}
+                          {(row.overdue || isOverdue(row.due_at)) && (
+                            <span className="ml-2 rounded bg-burgundy-700 px-1.5 py-0.5 text-xs font-bold text-white">
+                              overdue
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">{row.task_state}</td>
+                        <td className="px-3 py-2">
+                          {row.first_name} {row.last_name ?? ''}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">{formatTimestamp(row.due_at)}</td>
+                        <td className="px-3 py-2 whitespace-nowrap">{formatTimestamp(row.enquired_at)}</td>
+                        <td className="px-3 py-2">{ownerName(row.owner_id, members)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </Panel>
+
+            <Panel title="Enquiries" state={enquiries}>
+              {(rows) => (
+                <table className="min-w-full text-left text-sm text-navy-800">
+                  <thead>
+                    <tr className="border-b border-navy-100 text-xs uppercase tracking-wide text-navy-600">
+                      <th className="px-3 py-2">Prospect</th>
+                      <th className="px-3 py-2">Stage</th>
+                      <th className="px-3 py-2">Source</th>
+                      <th className="px-3 py-2">Enquired</th>
+                      <th className="px-3 py-2">Owner</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((row) => {
+                      const person = toOne(row.person)
+                      const chip = stageChip(row.stage)
+                      return (
+                        <tr key={row.id} className="border-b border-navy-100 last:border-0">
+                          <td className="px-3 py-2">
+                            {person ? (
+                              <>
+                                <span className="font-medium">
+                                  {person.first_name} {person.last_name ?? ''}
+                                </span>
+                                <span className="block text-xs text-navy-600">{person.email}</span>
+                              </>
+                            ) : (
+                              <span className="text-navy-600">Unknown</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2">
+                            <span className={chip.className}>{chip.label}</span>
+                          </td>
+                          <td className="px-3 py-2">{row.utm_source ?? '—'}</td>
+                          <td className="px-3 py-2 whitespace-nowrap">{formatTimestamp(row.created_at)}</td>
+                          <td className="px-3 py-2">{ownerName(row.assigned_to, members)}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </Panel>
+
+            <Panel title="Notification jobs" state={jobs}>
+              {(rows) => (
+                <table className="min-w-full text-left text-sm text-navy-800">
+                  <thead>
+                    <tr className="border-b border-navy-100 text-xs uppercase tracking-wide text-navy-600">
+                      <th className="px-3 py-2">Type</th>
+                      <th className="px-3 py-2">To</th>
+                      <th className="px-3 py-2">Status</th>
+                      <th className="px-3 py-2">Attempts</th>
+                      <th className="px-3 py-2">Created</th>
+                      <th className="px-3 py-2">Last error</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((row) => {
+                      const chip = notificationStatusChip(row.status)
+                      return (
+                        <tr key={row.id} className="border-b border-navy-100 last:border-0">
+                          <td className="px-3 py-2 font-medium">{row.type}</td>
+                          <td className="px-3 py-2">{row.to_email}</td>
+                          <td className="px-3 py-2">
+                            <span className={chip.className}>{chip.label}</span>
+                          </td>
+                          <td className="px-3 py-2">{row.attempts}</td>
+                          <td className="px-3 py-2 whitespace-nowrap">{formatTimestamp(row.created_at)}</td>
+                          <td className="px-3 py-2 max-w-52 truncate text-burgundy-700" title={row.last_error ?? ''}>
+                            {row.last_error ?? '—'}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </Panel>
+          </div>
         </>
       )}
     </div>
+  )
+}
+
+/** Panel shell giving every dashboard section the same loading/empty/error states
+ * (plan §11 definition of done). */
+function Panel<T>({ title, state, children }: { title: string; state: PanelState<T>; children: (rows: T[]) => ReactNode }) {
+  return (
+    <section className="overflow-x-auto rounded-xl bg-white shadow">
+      <h2 className="border-b border-navy-100 px-4 py-3 text-lg font-extrabold text-navy-800">{title}</h2>
+      {state.status === 'loading' && <p className="px-4 py-4 text-sm text-navy-600">Loading {title.toLowerCase()}…</p>}
+      {state.status === 'error' && (
+        <div role="alert" className="m-4 rounded-lg bg-burgundy-100 p-3 text-sm font-medium text-burgundy-800">
+          Could not load {title.toLowerCase()}: {state.error}
+        </div>
+      )}
+      {state.status === 'done' && state.rows.length === 0 && (
+        <p className="px-4 py-4 text-sm text-navy-600">Nothing here right now.</p>
+      )}
+      {state.status === 'done' && state.rows.length > 0 && children(state.rows)}
+    </section>
   )
 }

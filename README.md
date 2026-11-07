@@ -32,8 +32,12 @@ npm run dev
 
 ```bash
 # WF-01 workflow tests (requires deployed submit-enquiry function):
-npm test        # in app/ for unit tests
-node ../tests/wf01.test.mjs   # end-to-end-ish: submit → task → idempotency
+cd app && npm test          # frontend unit tests
+node tests/wf01.test.mjs    # enquiry flow: happy path, idempotency, validation, rate limit, anon invoke, alert
+node tests/mailer.test.mjs  # notification queue worker (dry-run drain, audit)
+
+# Drain the notification queue manually (dry-run unless EMAIL_DRY_RUN=false is approved):
+npx -y @insforge/cli functions invoke process-notification-jobs --method POST
 ```
 
 ## Safety rules (from plan §13)
