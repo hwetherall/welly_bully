@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
+import { liveRegionProps } from '../../lib/a11y'
 import { Panel, type PanelState } from '../../components/admin-chrome'
 import { useClubAuth } from '../../hooks/useClubAuth'
 import { canCoordinate } from '../../lib/crm'
@@ -205,7 +206,7 @@ function AdminEventsPage() {
 
       {banner && (
         <div
-          role="status"
+          {...liveRegionProps}
           className={`rounded-lg p-3 text-sm font-medium ${
             banner.kind === 'success' ? 'bg-green-100 text-green-800' : 'bg-burgundy-100 text-burgundy-800'
           }`}

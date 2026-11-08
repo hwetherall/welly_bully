@@ -1,7 +1,7 @@
 # Denver Bulldogs — Bulldogs OS (welly_bully)
 
 Recruitment & retention operating system for the Denver Bulldogs Australian Rules Football Club.
-Product source of truth: [`plan.md`](./plan.md). Architecture decisions: [`DECISIONS.md`](./DECISIONS.md). Task board: [`TASKS.md`](./TASKS.md).
+Product source of truth: [`plan.md`](./plan.md). Architecture decisions: [`DECISIONS.md`](./DECISIONS.md). Task board: [`TASKS.md`](./TASKS.md). Sprint history: [`CHANGELOG.md`](./CHANGELOG.md). Privacy notice (DRAFT for committee): [`PRIVACY.md`](./PRIVACY.md). Handover / 30-day runbook (DRAFT for committee): [`HANDOFF.md`](./HANDOFF.md).
 
 ## Stack
 
@@ -31,13 +31,18 @@ npm run dev
 ## Test
 
 ```bash
-# WF-01 workflow tests (requires deployed submit-enquiry function):
-cd app && npm test          # frontend unit tests
-node tests/wf01.test.mjs    # enquiry flow: happy path, idempotency, validation, rate limit, anon invoke, alert
-node tests/mailer.test.mjs  # notification queue worker (dry-run drain, audit)
-node tests/crm.test.mjs     # Sprint 2 CRM RPCs with signed-in dev users (permissions, reassign, stats)
-node tests/import.test.mjs  # Sprint 3 roster import preview/confirm + returning-player reconciliation
-node tests/calendar.test.mjs # Sprint 4 calendar/attendance: event RPCs, ICS feed, milestones, notices
+# Full verification (frontend):
+cd app && npm run build && npm test && npx tsc --noEmit   # build + vitest unit tests + strict typecheck
+
+# Frontend unit tests only:
+cd app && npm test
+
+# Backend / workflow suites (run from repo root; need .env.local keys):
+node tests/wf01.test.mjs     # Sprint 1: enquiry flow — happy path, idempotency, validation, rate limit, anon invoke, alert
+node tests/mailer.test.mjs   # notification queue worker (dry-run drain, audit)
+node tests/crm.test.mjs      # Sprint 2: CRM RPCs with signed-in dev users (permissions, reassign, stats)
+node tests/import.test.mjs   # Sprint 3: roster import preview/confirm + returning-player reconciliation
+node tests/calendar.test.mjs # Sprint 4: calendar/attendance — event RPCs, ICS feed, milestones, notices
 
 # Public calendar feed (deployed):
 #   https://z7nhzchw.us-west.insforge.app/functions/events-ics          (all public)

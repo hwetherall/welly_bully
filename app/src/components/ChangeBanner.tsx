@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { PublicEventsState } from '../hooks/usePublicEvents'
 import type { PublicEventRow } from '../lib/types'
+import { liveRegionProps } from '../lib/a11y'
 import { bannerDismissKey } from '../lib/calendar'
 import { publicIcsEventUrl } from '../lib/events'
 import { formatEventDate, formatEventTimeRange } from '../lib/format'
@@ -35,7 +36,7 @@ export function ChangeBanner({ state }: { state: PublicEventsState<PublicEventRo
 
   const tz = event.time_zone || 'America/Denver'
   return (
-    <div role="status" className="mb-6 rounded-xl border-2 border-gold-500 bg-navy-800 p-4 shadow">
+    <div {...liveRegionProps} className="mb-6 rounded-xl border-2 border-gold-500 bg-navy-800 p-4 shadow">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-extrabold uppercase tracking-wide text-gold-400">Schedule update</p>

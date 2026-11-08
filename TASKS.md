@@ -52,8 +52,15 @@ Source of truth for what's done / doing / next. Mirrors `plan.md` §10 sprints. 
 
 **Sprint 4 acceptance (plan §10):** ✅ authorized edit → revision bump + material_change + audit, visible in feed immediately with stable UID and explicit cancellation; change notice is admin-triggered, consent-scoped, queued (dry-run) and logged; attendance links person↔event↔season and derives first/second training milestones. Google/Outlook subscription refresh-delay caveat documented in plan P1.2 (feed is always current; subscribers refresh eventually). Live click-through still needs a manual `npm run dev` pass.
 
-## Sprint 5 — Production hardening + handover
-- [ ] Restore test, monitoring, privacy/deletion checks, CSV export, docs, 2-admin handover, launch on club domain (approval-gated)
+## Sprint 5 — Production hardening + handover — IN PROGRESS (non-destructive parts DONE 2026-11-08)
+- [x] Advisor security scan + fixes: EXECUTE revoked from PUBLIC/anon on all 18 SECURITY DEFINER functions (submit_enquiry owner-only; helpers stay authenticated for RLS); 24 FK/RLS indexes added. Criticals 36 -> 0. Remaining findings are intentional and documented in DECISIONS D11 (17 authenticated-callable self-checking RPCs, rls-select-only on function-written tables, permissive read on roles/seasons/user_roles reference data; unused-index info noise on a quiet dev DB)
+- [x] Backups: manual backup `sprint5-pre-hardening` created + verified; automatic daily scheduled backups already running (list shows them). Restore procedure documented in HANDOFF.md (`backups restore <id>` — OVERWRITES, confirm first)
+- [x] Privacy/deletion: `request_privacy_erasure(person_id)` RPC (admin-only, idempotent): redacts PII, soft-deletes, opts out, cancels queued notifications, audited. tests/hardening.test.mjs 13/13 PASS
+- [x] CSV export: `functions/export-data.ts` deployed (admin bearer-only, 12 tables, audited) — hardening tests cover 401/403/200 + CSV shape + audit
+- [x] Two-admin recovery: second admin dev user added (2 admins in user_roles); committee to nominate the real second admin (HANDOFF.md)
+- [x] Docs: PRIVACY.md (DRAFT for committee), HANDOFF.md (30-day runbook: creds, backups, weekly checklist, rollback, two-admin), CHANGELOG.md; a11y pass (skip link, focus-visible, reduced-motion, aria-live, contrast tests) — 110/110 app tests, tsc+build clean
+- [x] Full suite green: wf01 15/15, mailer 7/7, crm 10/10, import 19/19, calendar 19/19, hardening 13/13, app 110/110
+- [ ] APPROVAL-GATED (not done, per plan §13): real email sending (EMAIL_DRY_RUN=false + sending identity), weekly-digest schedule, frontend deployment + club domain, real roster import, privacy wording sign-off. Launch checklist in HANDOFF.md.
 
 ## Later (V2, not now)
 Payments/merch (Stripe via InsForge), member portal, automated outreach (explicitly out of scope per plan §4).

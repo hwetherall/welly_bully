@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { alertRegionProps, liveRegionProps } from '../lib/a11y'
 import { formatTimestamp } from '../lib/format'
 import { isOverdue, ownerName, stageChip, toOne } from '../lib/admin'
 import {
@@ -47,7 +48,7 @@ function StatusLine({ status }: { status: Status | null }) {
   if (!status) return null
   return (
     <p
-      role={status.kind === 'error' ? 'alert' : 'status'}
+      {...(status.kind === 'error' ? alertRegionProps : liveRegionProps)}
       className={`mt-2 rounded-lg p-2 text-sm font-medium ${
         status.kind === 'error' ? 'bg-burgundy-100 text-burgundy-800' : 'bg-green-100 text-green-800'
       }`}

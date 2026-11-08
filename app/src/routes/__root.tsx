@@ -1,4 +1,5 @@
 import { Link, Outlet, createRootRoute } from '@tanstack/react-router'
+import { MAIN_CONTENT_ID } from '../lib/a11y'
 
 export const Route = createRootRoute({
   component: RootLayout,
@@ -7,6 +8,13 @@ export const Route = createRootRoute({
 function RootLayout() {
   return (
     <div className="flex min-h-screen flex-col">
+      {/* Skip link: first tab stop, visible on keyboard focus (WCAG 2.4.1). */}
+      <a
+        href={`#${MAIN_CONTENT_ID}`}
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-gold-500 focus:px-4 focus:py-2 focus:font-bold focus:text-navy-950"
+      >
+        Skip to main content
+      </a>
       <header className="border-b border-navy-700 bg-navy-900">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
           <Link to="/" className="text-lg font-extrabold tracking-tight text-gold-400">
@@ -26,7 +34,7 @@ function RootLayout() {
         </div>
       </header>
 
-      <main className="flex-1">
+      <main id={MAIN_CONTENT_ID} className="flex-1" tabIndex={-1}>
         <Outlet />
       </main>
 

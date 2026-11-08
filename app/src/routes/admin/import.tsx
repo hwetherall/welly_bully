@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
+import { liveRegionProps } from '../../lib/a11y'
 import { Panel, type PanelState } from '../../components/admin-chrome'
 import { useClubAuth } from '../../hooks/useClubAuth'
 import { canCoordinate } from '../../lib/crm'
@@ -346,7 +347,7 @@ function ImportPage() {
         )}
 
         {confirm.status === 'done' && (
-          <div role="status" className="mt-4 rounded-lg bg-green-100 p-4 text-sm text-green-800">
+          <div {...liveRegionProps} className="mt-4 rounded-lg bg-green-100 p-4 text-sm text-green-800">
             <p className="font-bold">
               {confirm.result.already_confirmed ? 'This import was already confirmed.' : 'Import confirmed.'}
             </p>

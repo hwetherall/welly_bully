@@ -10,4 +10,26 @@
   body {
     @apply bg-navy-950 font-sans text-white antialiased;
   }
+
+  /* Keyboard focus must always be visible (WCAG 2.4.7). Gold ring plus a dark
+     outer ring so it reads on both navy and white surfaces. */
+  :focus-visible {
+    outline: 3px solid #f5b942; /* gold-400 */
+    outline-offset: 2px;
+    box-shadow: 0 0 0 5px #081426; /* navy-900 */
+    border-radius: 4px;
+  }
+
+  /* Respect reduced-motion preferences (WCAG 2.2.2): no pulsing skeletons,
+     no transitions, no smooth scrolling. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
