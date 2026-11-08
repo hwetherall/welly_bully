@@ -26,8 +26,15 @@ Source of truth for what's done / doing / next. Mirrors `plan.md` §10 sprints. 
 
 **Sprint 1 acceptance (plan §10):** ✅ test prospect submits (anon, browser path), sees confirmation data, exactly one confirmation email job queued (dry-run), appears in admin action queue with one owner and due = created+48h; duplicate submit and mailer failure don't corrupt records. Known follow-up: club_members self-upsert is admin-only by RLS (5 dev users seeded; add RPC path in Sprint 2 if needed).
 
-## Sprint 2 — Volunteer workflow + scoreboard (P0.5–P0.6)
-- [ ] CRM list/profile, interactions, stage changes, action queue, coordinator dashboard, audit trail
+## Sprint 2 — Volunteer workflow + scoreboard (P0.5–P0.6) — DONE 2026-11-08
+- [x] Migration 3: CRM RPCs with in-RPC permission checks + audit: set_enquiry_stage, log_interaction, complete_task, reassign_enquiry, recruitment_stats, upsert_my_club_member
+- [x] Migration 4: fix recruitment_stats ambiguity + auth.users metadata column
+- [x] Migration 5: audit_events readable by all staff (timeline for volunteers on own leads)
+- [x] tests/crm.test.mjs — 10/10 PASS with real signed-in users (assignee vs coordinator vs coach permissions, reassign, idempotent complete, stats staff-only, club_members upsert)
+- [x] CRM UI in app/: `/admin` overview, `/admin/leads` (filters: owner/stage/source/overdue), `/admin/leads/$id` (person card, stage editor, task completion, log-interaction form, reassign for coordinator/admin, milestone quick-log, merged activity timeline), `/admin/dashboard` (recruitment_stats: 48h SLA %, median hours to first attempt, overdue/unassigned, conversion; 7/30/90d windows); sign-in calls upsert_my_club_member
+- [x] app: build clean, tsc strict clean, 50/50 unit tests; backend suites re-run green (wf01 15/15, mailer 7/7, crm 10/10)
+
+**Sprint 2 acceptance (plan §10):** ✅ find/call/log/update an assigned lead via audited RPCs in seconds; coordinator sees overdue + unassigned and can reassign; all actions attributable (audit_events actor+timestamp). Live dev-server click-through not possible in agent sandbox (server spawn blocked) — verified via build + route tree + tests; manual `cd app && npm run dev` recommended.
 
 ## Sprint 3 — Returning players (P0.7)
 - [ ] CSV import preview/confirm, reconciliation, internal re-engagement tasks only

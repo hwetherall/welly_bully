@@ -65,3 +65,123 @@ export interface ClubMember {
   email: string
   full_name: string | null
 }
+
+//------------------------------------------------------------------------
+// Sprint 2 (P0.5/P0.6): volunteer CRM + coordinator scoreboard row shapes
+//------------------------------------------------------------------------
+
+/** Row of public.people as the lead detail selects it. */
+export interface PersonRow {
+  id: string
+  first_name: string
+  last_name: string | null
+  preferred_name: string | null
+  email: string
+  phone: string | null
+  consent_contact: boolean
+  consent_at: string | null
+  consent_text_version: string
+  contact_opt_out: boolean
+  source: string | null
+  created_at: string
+}
+
+/** Row of public.enquiries with the person embed, as the CRM list/detail select it.
+ * PostgREST may type the to-one embed as an array, so normalize at runtime. */
+export interface EnquiryDetailRow {
+  id: string
+  person_id: string
+  season_id: string
+  stage: string
+  stage_updated_at: string
+  assigned_to: string | null
+  utm_source: string | null
+  utm_medium: string | null
+  utm_campaign: string | null
+  channel: string
+  answers: Record<string, unknown>
+  created_at: string
+  person: PersonRow | PersonRow[] | null
+}
+
+/** Row of public.enquiries as the leads list selects it (person embed, subset). */
+export interface LeadListRow {
+  id: string
+  person_id: string
+  stage: string
+  created_at: string
+  assigned_to: string | null
+  utm_source: string | null
+  person:
+    | { first_name: string; last_name: string | null; email: string }
+    | { first_name: string; last_name: string | null; email: string }[]
+    | null
+}
+
+/** Row of public.tasks. */
+export interface TaskRow {
+  id: string
+  person_id: string
+  enquiry_id: string | null
+  type: string
+  state: string
+  owner_id: string | null
+  due_at: string
+  outcome: string | null
+  notes: string | null
+  completed_at: string | null
+  created_at: string
+}
+
+/** Row of public.interactions. */
+export interface InteractionRow {
+  id: string
+  person_id: string
+  enquiry_id: string | null
+  author_id: string
+  type: string
+  outcome: string | null
+  summary: string
+  next_action: string | null
+  next_action_due: string | null
+  created_at: string
+}
+
+/** Row of public.audit_events. */
+export interface AuditEventRow {
+  id: string
+  actor_id: string | null
+  action: string
+  table_name: string | null
+  record_id: string | null
+  before: Record<string, unknown> | null
+  after: Record<string, unknown> | null
+  created_at: string
+}
+
+/** Row of public.milestones. */
+export interface MilestoneRow {
+  id: string
+  person_id: string
+  season_id: string
+  type: string
+  achieved_at: string
+  source: string | null
+  recorded_by: string
+  notes: string | null
+  created_at: string
+}
+
+/** JSONB returned by rpc public.recruitment_stats(p_since) — aggregate only, no PII. */
+export interface RecruitmentStats {
+  since: string
+  enquiries_by_stage: Record<string, number>
+  enquiries_by_source_window: Record<string, number>
+  new_enquiries_in_window: number
+  unassigned_enquiries: number
+  overdue_open_tasks: number
+  median_hours_to_first_attempt: number
+  pct_attempted_within_48h: number | null
+  first_training_attendance_window: number
+  first_training_conversion_window: number | null
+}

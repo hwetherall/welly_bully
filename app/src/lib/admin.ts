@@ -61,6 +61,13 @@ export function stageChip(stage: string): Chip {
   }
 }
 
+/** Normalize a PostgREST to-one embed (`person:people(...)`, `roles(...)`),
+ * which may arrive as an object or a single-element array. */
+export function toOne<T>(embed: T | T[] | null | undefined): T | null {
+  if (embed == null) return null
+  return Array.isArray(embed) ? embed[0] ?? null : embed
+}
+
 /** Minimal shape of a club_members row used to resolve owner names. */
 export interface ClubMemberLike {
   id: string

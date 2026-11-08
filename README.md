@@ -35,6 +35,7 @@ npm run dev
 cd app && npm test          # frontend unit tests
 node tests/wf01.test.mjs    # enquiry flow: happy path, idempotency, validation, rate limit, anon invoke, alert
 node tests/mailer.test.mjs  # notification queue worker (dry-run drain, audit)
+node tests/crm.test.mjs     # Sprint 2 CRM RPCs with signed-in dev users (permissions, reassign, stats)
 
 # Drain the notification queue manually (dry-run unless EMAIL_DRY_RUN=false is approved):
 npx -y @insforge/cli functions invoke process-notification-jobs --method POST
