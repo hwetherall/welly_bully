@@ -36,8 +36,13 @@ Source of truth for what's done / doing / next. Mirrors `plan.md` §10 sprints. 
 
 **Sprint 2 acceptance (plan §10):** ✅ find/call/log/update an assigned lead via audited RPCs in seconds; coordinator sees overdue + unassigned and can reassign; all actions attributable (audit_events actor+timestamp). Live dev-server click-through not possible in agent sandbox (server spawn blocked) — verified via build + route tree + tests; manual `cd app && npm run dev` recommended.
 
-## Sprint 3 — Returning players (P0.7)
-- [ ] CSV import preview/confirm, reconciliation, internal re-engagement tasks only
+## Sprint 3 — Returning players (P0.7) — DONE 2026-11-08
+- [x] Migration 6: `people.import_id` + `data_imports.rows` provenance, `returning_player_candidates` view, RPCs create_roster_import (preview, no writes) / confirm_roster_import (consent stays FALSE) / create_reengagement_review (internal task, idempotent)
+- [x] tests/import.test.mjs — 19/19 PASS, re-runnable (preview counts, no writes on preview, role denials, consent=false, provenance, idempotent confirm, view flags 2026-only players, review task flow, zero auto-outreach)
+- [x] UI in app/: `/admin/import` (CSV upload/drag-drop, hand-rolled parser, sample CSV, season select, preview badges, coordinator-gated confirm, past imports) + `/admin/returning` (candidates table, create-review-task with owner select, already_exists handling); nav links added
+- [x] app: build clean, tsc strict clean, 84/84 unit tests; backend suites green (import 19/19 ×2 runs, crm 10/10, wf01 15/15, mailer 7/7)
+
+**Sprint 3 acceptance (plan §10):** ✅ import identifies unreturned players without duplicate profiles (email match, in-file dup + invalid flagged) and generates INTERNAL review tasks only — tests assert zero notification_jobs from imports and consent_contact=false on imported people. Live click-through needs a manual `npm run dev` pass (server spawn blocked in sandbox).
 
 ## Sprint 4 — Calendar + attendance (P1)
 - [ ] Event CRUD + change tracking, public `.ics` feed, change banner + manual approved notices, attendance capture

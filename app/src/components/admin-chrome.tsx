@@ -40,6 +40,8 @@ function AdminShell() {
           Overview
         </NavLink>
         <NavLink to="/admin/leads">Leads</NavLink>
+        <NavLink to="/admin/import">Import</NavLink>
+        <NavLink to="/admin/returning">Returning</NavLink>
         <NavLink to="/admin/dashboard">Scoreboard</NavLink>
       </nav>
 
@@ -76,7 +78,7 @@ function NavLink({
   exact,
   children,
 }: {
-  to: '/admin' | '/admin/leads' | '/admin/dashboard'
+  to: '/admin' | '/admin/leads' | '/admin/import' | '/admin/returning' | '/admin/dashboard'
   exact?: boolean
   children: ReactNode
 }) {
