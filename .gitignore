@@ -1,6 +1,7 @@
 
 # InsForge & AI agent skills
 .insforge
+.cursor
 
 # Local secrets
 .env
