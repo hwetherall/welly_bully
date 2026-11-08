@@ -44,8 +44,13 @@ Source of truth for what's done / doing / next. Mirrors `plan.md` §10 sprints. 
 
 **Sprint 3 acceptance (plan §10):** ✅ import identifies unreturned players without duplicate profiles (email match, in-file dup + invalid flagged) and generates INTERNAL review tasks only — tests assert zero notification_jobs from imports and consent_contact=false on imported people. Live click-through needs a manual `npm run dev` pass (server spawn blocked in sandbox).
 
-## Sprint 4 — Calendar + attendance (P1)
-- [ ] Event CRUD + change tracking, public `.ics` feed, change banner + manual approved notices, attendance capture
+## Sprint 4 — Calendar + attendance (P1) — DONE 2026-11-08
+- [x] Migration 7: events.material_change + revision tracking; RPCs upsert_event (calendar_editor/admin, audit before/after, material change detection), mark_attendance (coach+; derives first/second_training milestones in the event's season), queue_event_update_notice (coordinator/admin; consented participants only, idempotent per event+revision)
+- [x] functions/events-ics.ts deployed active: public feed (published+cancelled, stable UID, SEQUENCE=revision, STATUS:CANCELLED, VTIMEZONE America/Denver) + ?uid= single-event attachment; smoke-tested 200 text/calendar, drafts/private excluded
+- [x] tests/calendar.test.mjs — 19/19 PASS ×3 consecutive runs (draft hidden from anon, publish visible, role denials, revision/material_change/audit, ICS feed incl. cancellation + single-uid, attendance + derived milestones + season, notice queue consent-scoped + idempotent)
+- [x] UI: public change banner (dismissible) + upcoming sessions list + per-event .ics "Add to calendar" + feed subscribe link; /admin/events CRUD form with Denver-tz datetime handling + change-notice queue panel; /admin/attendance with person search, walk-in/consent, derived-milestone feedback; 107/107 app tests, strict tsc + build clean
+
+**Sprint 4 acceptance (plan §10):** ✅ authorized edit → revision bump + material_change + audit, visible in feed immediately with stable UID and explicit cancellation; change notice is admin-triggered, consent-scoped, queued (dry-run) and logged; attendance links person↔event↔season and derives first/second training milestones. Google/Outlook subscription refresh-delay caveat documented in plan P1.2 (feed is always current; subscribers refresh eventually). Live click-through still needs a manual `npm run dev` pass.
 
 ## Sprint 5 — Production hardening + handover
 - [ ] Restore test, monitoring, privacy/deletion checks, CSV export, docs, 2-admin handover, launch on club domain (approval-gated)

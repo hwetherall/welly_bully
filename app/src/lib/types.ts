@@ -14,6 +14,81 @@ export interface PublicEvent {
   description: string | null
 }
 
+/** Full events row as staff (calendar_editor/admin) select it — includes the
+ * Sprint 4 change-tracking columns (migration ..._sprint4-calendar-attendance.sql). */
+export interface AdminEventRow {
+  id: string
+  uid: string
+  type: string
+  title: string
+  venue: string | null
+  venue_url: string | null
+  starts_at: string
+  ends_at: string
+  time_zone: string
+  description: string | null
+  status: string
+  audience: string
+  revision: number
+  material_change: boolean
+  change_note: string | null
+  created_at: string
+  updated_at: string
+}
+
+/** Published public event incl. the columns the landing page needs for the
+ * change banner and .ics links (uid for the feed, material_change/change_note
+ * for the banner). Anon RLS exposes published public rows only. */
+export interface PublicEventRow extends PublicEvent {
+  uid: string
+  status: string
+  audience: string
+  revision: number
+  material_change: boolean
+  change_note: string | null
+  updated_at: string
+}
+
+/** Row of public.attendance with the person embed (PostgREST may type the
+ * to-one embed as an array — normalize with toOne). */
+export interface AttendanceRow {
+  id: string
+  event_id: string
+  person_id: string
+  walk_in: boolean
+  consent_recorded: boolean
+  checked_in_at: string
+  person:
+    | { first_name: string; last_name: string | null; preferred_name: string | null; email: string }
+    | { first_name: string; last_name: string | null; preferred_name: string | null; email: string }[]
+    | null
+}
+
+/** Minimal person row for the attendance person search (staff RLS). */
+export interface PersonSearchRow {
+  id: string
+  first_name: string
+  last_name: string | null
+  preferred_name: string | null
+  email: string
+}
+
+/** JSONB returned by rpc public.mark_attendance (Sprint 4 migration). */
+export interface MarkAttendanceResult {
+  attendance: AttendanceRow
+  milestones_derived: string[]
+  total_attendance_count: number
+}
+
+/** JSONB returned by rpc public.queue_event_update_notice (WF-04 step 4). */
+export interface QueueNoticeResult {
+  ok: boolean
+  event_id: string
+  revision: number
+  notices_queued: number
+  idempotency_key: string
+}
+
 /** Row of the public.action_queue view (plan P0.6). */
 export interface ActionQueueRow {
   task_id: string

@@ -33,8 +33,10 @@ describe('STAGE_OPTIONS (enquiry_stage enum, plan §6)', () => {
     expect(trainingPlanned?.label).toBe('training planned')
   })
 
-  it('milestone enum has 10 types', () => {
-    expect(MILESTONE_TYPES).toHaveLength(10)
+  it('milestone enum has 12 types (10 core + first/second_training added in Sprint 4)', () => {
+    expect(MILESTONE_TYPES).toHaveLength(12)
+    expect(MILESTONE_TYPES).toContain('first_training')
+    expect(MILESTONE_TYPES).toContain('second_training')
   })
 })
 

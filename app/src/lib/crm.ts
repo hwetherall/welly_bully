@@ -60,6 +60,9 @@ export const MILESTONE_TYPES = [
   'nationals_played',
   'season_return',
   'membership_active',
+  // Sprint 4 (Sprint 4 migration ADD VALUE): derived from attendance, never manual (plan P1.4)
+  'first_training',
+  'second_training',
 ] as const
 
 export type MilestoneType = (typeof MILESTONE_TYPES)[number]
@@ -75,6 +78,8 @@ export const MILESTONE_LABELS: Record<MilestoneType, string> = {
   nationals_played: 'Nationals appearance',
   season_return: 'Season return',
   membership_active: 'Membership active',
+  first_training: 'First training attended',
+  second_training: 'Second training attended (returning trainee)',
 }
 
 /** Pathway from the latest enquiry's form answers (enquiries.answers JSONB). */
